@@ -898,3 +898,78 @@ def interactive_menu(args: argparse.Namespace) -> int:
         print("3) View vault")
         print("4) Open vault")
         print("5) Deposit")
+        print("6) Withdraw")
+        print("7) Positions")
+        print("8) Harvest")
+        print("9) Advance block")
+        print("l) List credit lines")
+        print("o) Open credit line")
+        print("d) Draw credit")
+        print("r) Repay credit")
+        print("t) Tags")
+        print("c) Config list")
+        print("q) Quit")
+        try:
+            choice = input("Choice: ").strip().lower()
+        except EOFError:
+            print()
+            return 0
+        if choice == "q":
+            return 0
+        if choice == "1":
+            cmd_info(args)
+        elif choice == "2":
+            cmd_vaults(args)
+        elif choice == "3":
+            try:
+                vid = int(input("Vault id: ").strip())
+            except ValueError:
+                print("Invalid id.")
+                continue
+            args.vault_id = vid
+            cmd_vault(args)
+        elif choice == "4":
+            name = input("Vault name: ").strip() or "Untitled"
+            sym = input("Asset symbol (e.g. USDC): ").strip() or "TOKEN"
+            try:
+                cap = float(input("Deposit cap (wei, 0 = unlimited): ").strip() or "0")
+                mgmt = int(input("Mgmt fee bps (0-700): ").strip() or "0")
+                wdr = int(input("Withdraw fee bps (0-350): ").strip() or "0")
+                proto = int(input("Protocol fee bps (0-1500): ").strip() or "0")
+            except ValueError:
+                cap = 0.0
+                mgmt = wdr = proto = 0
+            hint = input("Strategy hint (optional): ").strip()
+            args.name = name
+            args.asset_symbol = sym
+            args.deposit_cap_wei = cap
+            args.management_fee_bps = mgmt
+            args.withdrawal_fee_bps = wdr
+            args.protocol_fee_bps = proto
+            args.strategy_hint = hint
+            args.disabled = False
+            cmd_open_vault(args)
+        elif choice == "5":
+            try:
+                vid = int(input("Vault id: ").strip())
+                amt = float(input("Amount (wei): ").strip())
+            except ValueError:
+                print("Invalid input.")
+                continue
+            owner = input("Owner address (0x...): ").strip() or "0x" + rand_hex(40)
+            args.vault_id = vid
+            args.amount_wei = amt
+            args.owner = owner
+            cmd_deposit(args)
+        elif choice == "6":
+            try:
+                vid = int(input("Vault id: ").strip())
+                sh = float(input("Shares: ").strip())
+            except ValueError:
+                print("Invalid input.")
+                continue
+            owner = input("Owner address (0x...): ").strip() or "0x" + rand_hex(40)
+            args.vault_id = vid
+            args.shares = sh
+            args.owner = owner
+            cmd_withdraw(args)
