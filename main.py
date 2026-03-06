@@ -598,3 +598,78 @@ def simulate_repay(state: MagicaState, line_id: int, amount_wei: float) -> Tuple
     if amount_wei <= 0:
         return state, "amount must be > 0"
     ensure_line_exists(state, line_id)
+    l = state.lines[line_id]
+    l, interest = accrue_line_interest(l, state.current_block)
+    if l.borrowed_wei <= 0:
+        return state, "nothing owed"
+    pay = min(amount_wei, l.borrowed_wei)
+    l.borrowed_wei -= pay
+    state.lines[line_id] = l
+    state.protocol_fee_wei += interest
+    msg = (
+        f"repay: line {line_id}, borrower {truncate(l.borrower)}, "
+        f"paid={fmt_eth(pay)}, interestAccrued={fmt_eth(interest)}, remaining={fmt_eth(l.borrowed_wei)}"
+    )
+    return state, msg
+
+
+def set_tag(state: MagicaState, address: str, tags_hash: str, note: str) -> MagicaState:
+    state.tags[address] = TagRecord(address=address, tags_hash=tags_hash, note=note)
+    return state
+
+
+# ---------------------------------------------------------------------------
+# CLI command implementations
+# ---------------------------------------------------------------------------
+
+
+def cmd_info(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    cfg = load_config(args.config)
+    print(f"{APP_NAME} v{APP_VERSION}")
+    print(f"State file : {state_path(args.state)}")
+    print(f"Config file: {config_path(args.config)}")
+    print(f"Vaults     : {len(state.vaults)}   Lines: {len(state.lines)}   Positions: {len(state.vault_positions)}")
+    print(f"Current block: {state.current_block}")
+    print(f"Fee collector: {truncate(state.fee_collector)}")
+    print(f"Guardian     : {truncate(state.guardian)}")
+    print(f"Risk council : {truncate(state.risk_council)}")
+    print(f"Protocol fee: {fmt_eth(state.protocol_fee_wei)}")
+    rpc_url = cfg.get("rpc_url", "(none)")
+    print(f"RPC URL (optional): {rpc_url}")
+    return 0
+
+
+def cmd_step(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    steps = max(1, args.blocks)
+    state.current_block += steps
+    save_state(state, args.state)
+    print(f"Advanced block by {steps} → {state.current_block}")
+    return 0
+
+
+def cmd_open_vault(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    cap_wei = float(args.deposit_cap_wei)
+    mgmt = args.management_fee_bps
+    wdr = args.withdrawal_fee_bps
+    proto = args.protocol_fee_bps
+    state, v = open_vault(
+        state=state,
+        name=args.name,
+        asset_symbol=args.asset_symbol,
+        deposit_cap_wei=cap_wei,
+        management_fee_bps=mgmt,
+        withdrawal_fee_bps=wdr,
+        protocol_fee_bps=proto,
+        strategy_hint=args.strategy_hint,
+        enabled=not args.disabled,
+    )
+    save_state(state, args.state)
+    print("Created vault:")
+    print(vault_summary(v, state))
+    return 0
+
+
+def cmd_vaults(args: argparse.Namespace) -> int:
