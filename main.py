@@ -448,3 +448,78 @@ def open_vault(
     protocol_fee_bps = int(clamp(protocol_fee_bps, 0, BFIN_MAX_PROTOCOL_FEE_BPS))
     v = VaultSim(
         vault_id=vid,
+        name=name,
+        asset_symbol=asset_symbol,
+        deposit_cap_wei=deposit_cap_wei,
+        management_fee_bps=management_fee_bps,
+        withdrawal_fee_bps=withdrawal_fee_bps,
+        protocol_fee_bps=protocol_fee_bps,
+        enabled=enabled,
+        last_accrual_block=state.current_block,
+        strategy_hint=strategy_hint,
+    )
+    state.vaults[vid] = v
+    return state, v
+
+
+def simulate_deposit(
+    state: MagicaState,
+    vault_id: int,
+    owner: str,
+    amount_wei: float,
+) -> Tuple[MagicaState, str]:
+    if amount_wei <= 0:
+        return state, "amount must be > 0"
+    ensure_vault_exists(state, vault_id)
+    v = state.vaults[vault_id]
+    if not v.enabled:
+        return state, "vault disabled"
+    v, fee = accrue_vault_fees(v, state.current_block)
+    if v.deposit_cap_wei > 0 and v.total_assets_wei + amount_wei > v.deposit_cap_wei:
+        return state, "deposit cap exceeded"
+    shares = convert_to_shares(v, amount_wei)
+    if shares <= 0:
+        shares = amount_wei
+    v.total_assets_wei += amount_wei
+    v.total_shares += shares
+    state.protocol_fee_wei += fee * (v.protocol_fee_bps / BFIN_BPS_BASE)
+    pos_key = (vault_id, owner)
+    pos = state.vault_positions.get(pos_key)
+    if pos is None:
+        pos = VaultPosition(vault_id=vault_id, owner=owner, shares=0.0, last_deposit_block=state.current_block)
+    pos.shares += shares
+    pos.last_deposit_block = state.current_block
+    state.vault_positions[pos_key] = pos
+    state.vaults[vault_id] = v
+    msg = (
+        f"deposit: vault {vault_id}, owner {truncate(owner)}, "
+        f"assets={fmt_eth(amount_wei)}, shares={shares:.6f}, mgmtFee={fmt_eth(fee)}"
+    )
+    return state, msg
+
+
+def simulate_withdraw(
+    state: MagicaState,
+    vault_id: int,
+    owner: str,
+    shares: float,
+) -> Tuple[MagicaState, str]:
+    if shares <= 0:
+        return state, "shares must be > 0"
+    ensure_vault_exists(state, vault_id)
+    v = state.vaults[vault_id]
+    pos_key = (vault_id, owner)
+    pos = state.vault_positions.get(pos_key)
+    if pos is None or pos.shares < shares:
+        return state, "insufficient shares"
+    v, fee = accrue_vault_fees(v, state.current_block)
+    gross = convert_to_assets(v, shares)
+    if gross <= 0 or gross > v.total_assets_wei:
+        return state, "invalid withdrawal amount"
+    w_fee = gross * (v.withdrawal_fee_bps / BFIN_BPS_BASE)
+    p_fee = gross * (v.protocol_fee_bps / BFIN_BPS_BASE)
+    total_fee = w_fee + p_fee + fee
+    payout = gross - (w_fee + p_fee)
+    v.total_assets_wei -= gross
+    v.total_shares -= shares
+    pos.shares -= shares
