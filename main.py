@@ -373,3 +373,78 @@ def vault_summary(v: VaultSim, state: MagicaState) -> str:
         f"Vault #{v.vault_id} — {v.name} ({v.asset_symbol})",
         f"  Enabled: {v.enabled}   Strategy: {v.strategy_hint or '(none)'}",
         f"  MgmtFee: {v.management_fee_bps} bps ({percent(v.management_fee_bps)}) "
+        f"WithdrawFee: {v.withdrawal_fee_bps} bps ({percent(v.withdrawal_fee_bps)}) "
+        f"ProtocolFee: {v.protocol_fee_bps} bps ({percent(v.protocol_fee_bps)})",
+        f"  Total assets: {fmt_eth(v.total_assets_wei)}   Total shares: {v.total_shares:.6f}",
+        f"  Deposit cap: {fmt_eth(v.deposit_cap_wei)}",
+        f"  Positions: {len(positions)}   Last accrual block: {v.last_accrual_block}",
+        f"  Created at: {v.created_at}",
+    ]
+    return "\n".join(lines)
+
+
+def position_summary(p: VaultPosition, v: VaultSim) -> str:
+    assets = convert_to_assets(v, p.shares)
+    return (
+        f"Vault #{p.vault_id} — {truncate(p.owner)}: "
+        f"{p.shares:.6f} shares (~{fmt_eth(assets)}), lastDepositBlock={p.last_deposit_block}"
+    )
+
+
+def line_summary(l: LineSim) -> str:
+    return (
+        f"Line #{l.line_id} — {truncate(l.borrower)} in {l.asset_symbol}: "
+        f"limit {fmt_eth(l.limit_wei)}, rate {l.rate_bps} bps, "
+        f"borrowed {fmt_eth(l.borrowed_wei)}, frozen={l.frozen}, "
+        f"createdAt={l.created_at}"
+    )
+
+
+def print_table(rows: List[List[str]]) -> str:
+    if not rows:
+        return ""
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    lines = []
+    for idx, row in enumerate(rows):
+        padded = "  ".join(row[i].ljust(widths[i]) for i in range(len(row)))
+        lines.append(padded)
+        if idx == 0:
+            lines.append("  ".join("-" * w for w in widths))
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Core operations
+# ---------------------------------------------------------------------------
+
+
+def ensure_vault_exists(state: MagicaState, vault_id: int) -> None:
+    if vault_id not in state.vaults:
+        raise ValueError("vault not found")
+
+
+def ensure_line_exists(state: MagicaState, line_id: int) -> None:
+    if line_id not in state.lines:
+        raise ValueError("line not found")
+
+
+def open_vault(
+    state: MagicaState,
+    name: str,
+    asset_symbol: str,
+    deposit_cap_wei: float,
+    management_fee_bps: int,
+    withdrawal_fee_bps: int,
+    protocol_fee_bps: int,
+    strategy_hint: str,
+    enabled: bool,
+) -> Tuple[MagicaState, VaultSim]:
+    if len(state.vaults) >= BFIN_MAX_VAULTS:
+        raise ValueError("max vaults reached")
+    vid = state.next_vault_id
+    state.next_vault_id += 1
+    management_fee_bps = int(clamp(management_fee_bps, 0, BFIN_MAX_MANAGEMENT_FEE_BPS))
+    withdrawal_fee_bps = int(clamp(withdrawal_fee_bps, 0, BFIN_MAX_WITHDRAWAL_FEE_BPS))
+    protocol_fee_bps = int(clamp(protocol_fee_bps, 0, BFIN_MAX_PROTOCOL_FEE_BPS))
+    v = VaultSim(
+        vault_id=vid,
