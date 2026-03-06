@@ -823,3 +823,78 @@ def cmd_set_tag(args: argparse.Namespace) -> int:
 
 def cmd_config(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
+    if args.get and not args.set:
+        print(cfg.get(args.get, ""))
+        return 0
+    if args.set:
+        cfg[args.set] = args.value
+        save_config(cfg, args.config)
+        print(f"Set {args.set} = {args.value}")
+        return 0
+    if not cfg:
+        print("No config entries.")
+        return 0
+    for k, v in sorted(cfg.items()):
+        print(f"{k}: {v}")
+    return 0
+
+
+def cmd_reset(args: argparse.Namespace) -> int:
+    p = state_path(args.state)
+    if not p.exists():
+        print("No state file to delete.")
+        return 0
+    if not args.yes:
+        try:
+            ans = input(f"Delete state file {p}? [y/N] ").strip().lower()
+        except EOFError:
+            ans = "n"
+        if ans != "y":
+            print("Aborted.")
+            return 1
+    p.unlink()
+    print(f"Deleted {p}")
+    return 0
+
+
+def try_import_web3():
+    try:
+        from web3 import Web3  # type: ignore
+        return Web3
+    except Exception:
+        return None
+
+
+def cmd_chain(args: argparse.Namespace) -> int:
+    cfg = load_config(args.config)
+    rpc = args.rpc or cfg.get("rpc_url")
+    if not rpc:
+        print("RPC URL not set (config set rpc_url <url>).")
+        return 1
+    Web3 = try_import_web3()
+    if Web3 is None:
+        print("web3 not installed; pip install web3")
+        return 1
+    w3 = Web3(Web3.HTTPProvider(rpc))
+    if not w3.is_connected():
+        print(f"Failed to connect to {rpc}")
+        return 1
+    print(f"Chain id: {w3.eth.chain_id}")
+    print(f"Latest block: {w3.eth.block_number}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Interactive menu
+# ---------------------------------------------------------------------------
+
+
+def interactive_menu(args: argparse.Namespace) -> int:
+    while True:
+        print()
+        print(f"{APP_NAME} v{APP_VERSION} — interactive mode")
+        print("1) Info")
+        print("2) List vaults")
+        print("3) View vault")
+        print("4) Open vault")
+        print("5) Deposit")
