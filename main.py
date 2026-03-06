@@ -973,3 +973,78 @@ def interactive_menu(args: argparse.Namespace) -> int:
             args.shares = sh
             args.owner = owner
             cmd_withdraw(args)
+        elif choice == "7":
+            owner = input("Filter by owner (optional): ").strip() or None
+            args.owner = owner
+            cmd_positions(args)
+        elif choice == "8":
+            try:
+                vid = int(input("Vault id: ").strip())
+                gain = float(input("Gain (wei): ").strip())
+            except ValueError:
+                print("Invalid input.")
+                continue
+            args.vault_id = vid
+            args.gain_wei = gain
+            cmd_harvest(args)
+        elif choice == "9":
+            try:
+                blk = int(input("Advance blocks by: ").strip() or "1")
+            except ValueError:
+                blk = 1
+            args.blocks = blk
+            cmd_step(args)
+        elif choice == "l":
+            cmd_lines(args)
+        elif choice == "o":
+            borrower = input("Borrower address: ").strip() or "0x" + rand_hex(40)
+            sym = input("Asset symbol: ").strip() or "TOKEN"
+            try:
+                limit = float(input("Limit (wei): ").strip())
+                rate = int(input("Rate bps (0-3000): ").strip())
+            except ValueError:
+                limit = 0.0
+                rate = 0
+            args.borrower = borrower
+            args.asset_symbol = sym
+            args.limit_wei = limit
+            args.rate_bps = rate
+            cmd_open_line(args)
+        elif choice == "d":
+            try:
+                lid = int(input("Line id: ").strip())
+                amt = float(input("Amount (wei): ").strip())
+            except ValueError:
+                print("Invalid input.")
+                continue
+            args.line_id = lid
+            args.amount_wei = amt
+            cmd_draw(args)
+        elif choice == "r":
+            try:
+                lid = int(input("Line id: ").strip())
+                amt = float(input("Amount (wei): ").strip())
+            except ValueError:
+                print("Invalid input.")
+                continue
+            args.line_id = lid
+            args.amount_wei = amt
+            cmd_repay(args)
+        elif choice == "t":
+            cmd_tags(args)
+        elif choice == "c":
+            cmd_config(args)
+        else:
+            print("Unknown choice.")
+    # not reached
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=f"{APP_NAME} — BeyondFinance simulator and helper")
+    parser.add_argument("--state", default=None, help="Path to state file")
+    parser.add_argument("--config", default=None, help="Path to config file")
