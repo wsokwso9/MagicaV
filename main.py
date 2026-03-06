@@ -748,3 +748,78 @@ def cmd_harvest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_open_line(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    limit = float(args.limit_wei)
+    rate = args.rate_bps
+    state, line = open_line(
+        state=state,
+        borrower=args.borrower,
+        asset_symbol=args.asset_symbol,
+        limit_wei=limit,
+        rate_bps=rate,
+    )
+    save_state(state, args.state)
+    print("Created line:")
+    print(line_summary(line))
+    return 0
+
+
+def cmd_lines(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    if not state.lines:
+        print("No credit lines.")
+        return 0
+    for lid in sorted(state.lines.keys()):
+        print(line_summary(state.lines[lid]))
+    return 0
+
+
+def cmd_line(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    lid = args.line_id
+    if lid not in state.lines:
+        print("Line not found.")
+        return 1
+    print(line_summary(state.lines[lid]))
+    return 0
+
+
+def cmd_draw(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    amt = float(args.amount_wei)
+    state, msg = simulate_draw(state, args.line_id, amt)
+    save_state(state, args.state)
+    print(msg)
+    return 0
+
+
+def cmd_repay(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    amt = float(args.amount_wei)
+    state, msg = simulate_repay(state, args.line_id, amt)
+    save_state(state, args.state)
+    print(msg)
+    return 0
+
+
+def cmd_tags(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    if not state.tags:
+        print("No tags.")
+        return 0
+    for addr, rec in state.tags.items():
+        print(f"{truncate(addr)} → {rec.tags_hash} ({rec.note})")
+    return 0
+
+
+def cmd_set_tag(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    state = set_tag(state, args.address, args.tags_hash, args.note or "")
+    save_state(state, args.state)
+    print(f"Set tags for {truncate(args.address)}")
+    return 0
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    cfg = load_config(args.config)
