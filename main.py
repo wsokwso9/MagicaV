@@ -1048,3 +1048,78 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=f"{APP_NAME} — BeyondFinance simulator and helper")
     parser.add_argument("--state", default=None, help="Path to state file")
     parser.add_argument("--config", default=None, help="Path to config file")
+
+    sub = parser.add_subparsers(dest="command", help="Command")
+
+    sub.add_parser("info", help="Show app info and config")
+
+    p_step = sub.add_parser("step", help="Advance simulated block height")
+    p_step.add_argument("--blocks", type=int, default=1, help="Blocks to advance")
+
+    p_ov = sub.add_parser("open-vault", help="Open a new simulated vault")
+    p_ov.add_argument("--name", required=True)
+    p_ov.add_argument("--asset-symbol", required=True)
+    p_ov.add_argument("--deposit-cap-wei", type=float, default=0.0)
+    p_ov.add_argument("--management-fee-bps", type=int, default=0)
+    p_ov.add_argument("--withdrawal-fee-bps", type=int, default=0)
+    p_ov.add_argument("--protocol-fee-bps", type=int, default=0)
+    p_ov.add_argument("--strategy-hint", default="")
+    p_ov.add_argument("--disabled", action="store_true")
+
+    sub.add_parser("vaults", help="List all vaults")
+
+    p_v = sub.add_parser("vault", help="Show details for a single vault")
+    p_v.add_argument("vault_id", type=int)
+
+    p_dep = sub.add_parser("deposit", help="Simulate a deposit into a vault")
+    p_dep.add_argument("vault_id", type=int)
+    p_dep.add_argument("owner", help="Owner address")
+    p_dep.add_argument("amount_wei", type=float)
+
+    p_wd = sub.add_parser("withdraw", help="Simulate a withdraw from a vault")
+    p_wd.add_argument("vault_id", type=int)
+    p_wd.add_argument("owner", help="Owner address")
+    p_wd.add_argument("shares", type=float)
+
+    p_pos = sub.add_parser("positions", help="List vault positions")
+    p_pos.add_argument("--owner", default=None, help="Filter by owner")
+
+    p_h = sub.add_parser("harvest", help="Simulate a harvest on a vault")
+    p_h.add_argument("vault_id", type=int)
+    p_h.add_argument("gain_wei", type=float)
+
+    p_ol = sub.add_parser("open-line", help="Open a new credit line")
+    p_ol.add_argument("borrower", help="Borrower address")
+    p_ol.add_argument("asset_symbol", help="Asset symbol")
+    p_ol.add_argument("limit_wei", type=float)
+    p_ol.add_argument("rate_bps", type=int)
+
+    sub.add_parser("lines", help="List credit lines")
+
+    p_ln = sub.add_parser("line", help="Show a single credit line")
+    p_ln.add_argument("line_id", type=int)
+
+    p_dr = sub.add_parser("draw", help="Simulate drawing from credit line")
+    p_dr.add_argument("line_id", type=int)
+    p_dr.add_argument("amount_wei", type=float)
+
+    p_rp = sub.add_parser("repay", help="Simulate repaying credit line")
+    p_rp.add_argument("line_id", type=int)
+    p_rp.add_argument("amount_wei", type=float)
+
+    sub.add_parser("tags", help="List user tags")
+
+    p_st = sub.add_parser("set-tag", help="Set a user tag hash")
+    p_st.add_argument("address", help="User address")
+    p_st.add_argument("tags_hash", help="Tags hash (hex or any string)")
+    p_st.add_argument("--note", default="", help="Optional note")
+
+    p_cfg = sub.add_parser("config", help="Get/set/list config")
+    p_cfg.add_argument("--get", default=None)
+    p_cfg.add_argument("--set", default=None)
+    p_cfg.add_argument("value", nargs="?", default=None)
+
+    p_rs = sub.add_parser("reset", help="Delete state file")
+    p_rs.add_argument("-y", "--yes", action="store_true")
+
+    p_ch = sub.add_parser("chain", help="Show basic chain info via RPC")
