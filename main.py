@@ -523,3 +523,78 @@ def simulate_withdraw(
     v.total_assets_wei -= gross
     v.total_shares -= shares
     pos.shares -= shares
+    if pos.shares <= 0:
+        state.vault_positions.pop(pos_key, None)
+    else:
+        state.vault_positions[pos_key] = pos
+    state.vaults[vault_id] = v
+    state.protocol_fee_wei += total_fee
+    msg = (
+        f"withdraw: vault {vault_id}, owner {truncate(owner)}, "
+        f"shares={shares:.6f}, payout={fmt_eth(payout)}, totalFee={fmt_eth(total_fee)}"
+    )
+    return state, msg
+
+
+def simulate_harvest(state: MagicaState, vault_id: int, gain_wei: float) -> Tuple[MagicaState, str]:
+    if gain_wei <= 0:
+        return state, "gain must be > 0"
+    ensure_vault_exists(state, vault_id)
+    v = state.vaults[vault_id]
+    protocol_cut = gain_wei * (v.protocol_fee_bps / BFIN_BPS_BASE)
+    net_gain = gain_wei - protocol_cut
+    v.total_assets_wei += net_gain
+    state.protocol_fee_wei += protocol_cut
+    state.vaults[vault_id] = v
+    msg = f"harvest: vault {vault_id}, gain={fmt_eth(gain_wei)}, protocolCut={fmt_eth(protocol_cut)}"
+    return state, msg
+
+
+def open_line(
+    state: MagicaState,
+    borrower: str,
+    asset_symbol: str,
+    limit_wei: float,
+    rate_bps: int,
+) -> Tuple[MagicaState, LineSim]:
+    if len(state.lines) >= BFIN_MAX_LINES:
+        raise ValueError("max lines reached")
+    if rate_bps <= 0 or rate_bps > BFIN_MAX_RATE_BPS:
+        raise ValueError("invalid rate")
+    lid = state.next_line_id
+    state.next_line_id += 1
+    l = LineSim(
+        line_id=lid,
+        borrower=borrower,
+        asset_symbol=asset_symbol,
+        limit_wei=limit_wei,
+        rate_bps=rate_bps,
+        last_accrual_block=state.current_block,
+    )
+    state.lines[lid] = l
+    return state, l
+
+
+def simulate_draw(state: MagicaState, line_id: int, amount_wei: float) -> Tuple[MagicaState, str]:
+    if amount_wei <= 0:
+        return state, "amount must be > 0"
+    ensure_line_exists(state, line_id)
+    l = state.lines[line_id]
+    if l.frozen:
+        return state, "line frozen"
+    l, _interest = accrue_line_interest(l, state.current_block)
+    if l.borrowed_wei + amount_wei > l.limit_wei:
+        return state, "limit exceeded"
+    l.borrowed_wei += amount_wei
+    state.lines[line_id] = l
+    msg = (
+        f"draw: line {line_id}, borrower {truncate(l.borrower)}, "
+        f"amount={fmt_eth(amount_wei)}, borrowed={fmt_eth(l.borrowed_wei)}"
+    )
+    return state, msg
+
+
+def simulate_repay(state: MagicaState, line_id: int, amount_wei: float) -> Tuple[MagicaState, str]:
+    if amount_wei <= 0:
+        return state, "amount must be > 0"
+    ensure_line_exists(state, line_id)
