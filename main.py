@@ -73,3 +73,78 @@ def clamp(v: float, lo: float, hi: float) -> float:
 def rand_hex(n: int) -> str:
     alphabet = "0123456789abcdef"
     return "".join(random.choice(alphabet) for _ in range(n))
+
+
+def truncate(addr: str, head: int = 6, tail: int = 4) -> str:
+    if not addr or len(addr) <= head + tail + 2:
+        return addr
+    if addr.startswith("0x"):
+        return f"{addr[: head + 2]}…{addr[-tail:]}"
+    return f"{addr[:head]}…{addr[-tail:]}"
+
+
+def wrap(text: str, width: int = 78, indent: str = "") -> str:
+    return "\n".join(indent + line for line in textwrap.wrap(text, width))
+
+
+def percent(bps: int) -> str:
+    return f"{bps / BFIN_BPS_BASE * 100:.2f}%"
+
+
+# ---------------------------------------------------------------------------
+# Data models
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class VaultSim:
+    vault_id: int
+    name: str
+    asset_symbol: str
+    deposit_cap_wei: float
+    management_fee_bps: int
+    withdrawal_fee_bps: int
+    protocol_fee_bps: int
+    enabled: bool = True
+    total_assets_wei: float = 0.0
+    total_shares: float = 0.0
+    last_accrual_block: int = 0
+    strategy_hint: str = ""
+    created_at: str = field(default_factory=now_iso)
+
+
+@dataclass
+class VaultPosition:
+    vault_id: int
+    owner: str
+    shares: float
+    last_deposit_block: int
+
+
+@dataclass
+class LineSim:
+    line_id: int
+    borrower: str
+    asset_symbol: str
+    limit_wei: float
+    rate_bps: int
+    borrowed_wei: float = 0.0
+    last_accrual_block: int = 0
+    frozen: bool = False
+    created_at: str = field(default_factory=now_iso)
+
+
+@dataclass
+class TagRecord:
+    address: str
+    tags_hash: str
+    note: str = ""
+
+
+@dataclass
+class MagicaState:
+    current_block: int = 0
+    next_vault_id: int = 1
+    next_line_id: int = 1
+    vaults: Dict[int, VaultSim] = field(default_factory=dict)
+    vault_positions: Dict[Tuple[int, str], VaultPosition] = field(default_factory=dict)
