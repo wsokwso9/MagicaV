@@ -673,3 +673,78 @@ def cmd_open_vault(args: argparse.Namespace) -> int:
 
 
 def cmd_vaults(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    if not state.vaults:
+        print("No vaults.")
+        return 0
+    for vid in sorted(state.vaults.keys()):
+        print(vault_summary(state.vaults[vid], state))
+        print()
+    return 0
+
+
+def cmd_vault(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    vid = args.vault_id
+    if vid not in state.vaults:
+        print("Vault not found.")
+        return 1
+    print(vault_summary(state.vaults[vid], state))
+    return 0
+
+
+def cmd_deposit(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    amt = float(args.amount_wei)
+    owner = args.owner
+    state, msg = simulate_deposit(state, args.vault_id, owner, amt)
+    save_state(state, args.state)
+    print(msg)
+    return 0
+
+
+def cmd_withdraw(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    shares = float(args.shares)
+    owner = args.owner
+    state, msg = simulate_withdraw(state, args.vault_id, owner, shares)
+    save_state(state, args.state)
+    print(msg)
+    return 0
+
+
+def cmd_positions(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    owner = args.owner
+    rows: List[List[str]] = [["Vault", "Owner", "Shares", "ApproxAssets"]]
+    for (vid, addr), pos in state.vault_positions.items():
+        if owner and addr.lower() != owner.lower():
+            continue
+        v = state.vaults.get(vid)
+        if not v:
+            continue
+        assets = convert_to_assets(v, pos.shares)
+        rows.append(
+            [
+                str(vid),
+                truncate(addr),
+                f"{pos.shares:.6f}",
+                fmt_eth(assets),
+            ]
+        )
+    if len(rows) == 1:
+        print("No positions.")
+        return 0
+    print(print_table(rows))
+    return 0
+
+
+def cmd_harvest(args: argparse.Namespace) -> int:
+    state = load_state(args.state)
+    gain = float(args.gain_wei)
+    state, msg = simulate_harvest(state, args.vault_id, gain)
+    save_state(state, args.state)
+    print(msg)
+    return 0
+
+
