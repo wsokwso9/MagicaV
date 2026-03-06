@@ -298,3 +298,78 @@ def save_config(cfg: Dict[str, Any], path: Optional[str] = None) -> None:
     p = config_path(path)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except OSError as exc:
+        print(f"[WARN] failed to save config to {p}: {exc}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Simulation primitives
+# ---------------------------------------------------------------------------
+
+
+def accrue_vault_fees(v: VaultSim, current_block: int) -> Tuple[VaultSim, float]:
+    if v.management_fee_bps <= 0:
+        v.last_accrual_block = current_block
+        return v, 0.0
+    if v.total_assets_wei <= 0.0 or v.total_shares <= 0.0:
+        v.last_accrual_block = current_block
+        return v, 0.0
+    elapsed = max(0, current_block - v.last_accrual_block)
+    if elapsed == 0:
+        return v, 0.0
+    annual_blocks = 15_768_000
+    fraction = (v.management_fee_bps / BFIN_BPS_BASE) * (elapsed / annual_blocks)
+    fee = v.total_assets_wei * fraction
+    fee = max(0.0, min(fee, v.total_assets_wei))
+    v.total_assets_wei -= fee
+    v.last_accrual_block = current_block
+    return v, fee
+
+
+def convert_to_shares(v: VaultSim, assets_wei: float) -> float:
+    if v.total_shares <= 0.0 or v.total_assets_wei <= 0.0:
+        return assets_wei
+    if assets_wei <= 0.0:
+        return 0.0
+    return assets_wei * (v.total_shares / v.total_assets_wei)
+
+
+def convert_to_assets(v: VaultSim, shares: float) -> float:
+    if v.total_shares <= 0.0 or v.total_assets_wei <= 0.0:
+        return shares
+    if shares <= 0.0:
+        return 0.0
+    return shares * (v.total_assets_wei / v.total_shares)
+
+
+def accrue_line_interest(line: LineSim, current_block: int) -> Tuple[LineSim, float]:
+    if line.rate_bps <= 0 or line.borrowed_wei <= 0.0:
+        line.last_accrual_block = current_block
+        return line, 0.0
+    elapsed = max(0, current_block - line.last_accrual_block)
+    if elapsed == 0:
+        return line, 0.0
+    annual_blocks = 15_768_000
+    fraction = (line.rate_bps / BFIN_BPS_BASE) * (elapsed / annual_blocks)
+    interest = line.borrowed_wei * fraction
+    interest = max(0.0, interest)
+    line.borrowed_wei += interest
+    line.last_accrual_block = current_block
+    return line, interest
+
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+
+def vault_summary(v: VaultSim, state: MagicaState) -> str:
+    positions = [
+        p for (vid, _), p in state.vault_positions.items() if vid == v.vault_id
+    ]
+    lines = [
+        f"Vault #{v.vault_id} — {v.name} ({v.asset_symbol})",
+        f"  Enabled: {v.enabled}   Strategy: {v.strategy_hint or '(none)'}",
+        f"  MgmtFee: {v.management_fee_bps} bps ({percent(v.management_fee_bps)}) "
