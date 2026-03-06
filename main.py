@@ -223,3 +223,78 @@ def state_from_dict(d: Dict[str, Any]) -> MagicaState:
     s.protocol_fee_wei = float(d.get("protocol_fee_wei", 0.0))
 
     for k, v in d.get("vaults", {}).items():
+        s.vaults[int(k)] = vault_from_dict(v)
+
+    for k, v in d.get("vault_positions", {}).items():
+        vid_str, addr = k.split(":", 1)
+        s.vault_positions[(int(vid_str), addr)] = pos_from_dict(v)
+
+    for k, v in d.get("lines", {}).items():
+        s.lines[int(k)] = line_from_dict(v)
+
+    for addr, v in d.get("tags", {}).items():
+        s.tags[addr] = tag_from_dict(v)
+
+    return s
+
+
+# ---------------------------------------------------------------------------
+# File helpers
+# ---------------------------------------------------------------------------
+
+
+def state_path(custom: Optional[str] = None) -> Path:
+    if custom:
+        return Path(custom)
+    env = os.environ.get("MAGICAV_STATE_FILE")
+    if env:
+        return Path(env)
+    return Path.cwd() / DEFAULT_STATE_FILE
+
+
+def config_path(custom: Optional[str] = None) -> Path:
+    if custom:
+        return Path(custom)
+    env = os.environ.get("MAGICAV_CONFIG_FILE")
+    if env:
+        return Path(env)
+    return Path.cwd() / DEFAULT_CONFIG_FILE
+
+
+def load_state(path: Optional[str] = None) -> MagicaState:
+    p = state_path(path)
+    if not p.exists():
+        return MagicaState()
+    try:
+        with p.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return state_from_dict(data)
+    except (OSError, json.JSONDecodeError):
+        return MagicaState()
+
+
+def save_state(state: MagicaState, path: Optional[str] = None) -> None:
+    p = state_path(path)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as f:
+            json.dump(state_to_dict(state), f, indent=2)
+    except OSError as exc:
+        print(f"[WARN] failed to save state to {p}: {exc}", file=sys.stderr)
+
+
+def load_config(path: Optional[str] = None) -> Dict[str, Any]:
+    p = config_path(path)
+    if not p.exists():
+        return {}
+    try:
+        with p.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_config(cfg: Dict[str, Any], path: Optional[str] = None) -> None:
+    p = config_path(path)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
