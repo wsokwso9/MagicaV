@@ -148,3 +148,78 @@ class MagicaState:
     next_line_id: int = 1
     vaults: Dict[int, VaultSim] = field(default_factory=dict)
     vault_positions: Dict[Tuple[int, str], VaultPosition] = field(default_factory=dict)
+    lines: Dict[int, LineSim] = field(default_factory=dict)
+    tags: Dict[str, TagRecord] = field(default_factory=dict)
+    fee_collector: str = field(default_factory=lambda: "0x" + rand_hex(40))
+    guardian: str = field(default_factory=lambda: "0x" + rand_hex(40))
+    risk_council: str = field(default_factory=lambda: "0x" + rand_hex(40))
+    protocol_fee_wei: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
+
+
+def vault_to_dict(v: VaultSim) -> Dict[str, Any]:
+    return dataclasses.asdict(v)
+
+
+def vault_from_dict(d: Dict[str, Any]) -> VaultSim:
+    return VaultSim(**d)
+
+
+def pos_to_dict(p: VaultPosition) -> Dict[str, Any]:
+    return dataclasses.asdict(p)
+
+
+def pos_from_dict(d: Dict[str, Any]) -> VaultPosition:
+    return VaultPosition(**d)
+
+
+def line_to_dict(l: LineSim) -> Dict[str, Any]:
+    return dataclasses.asdict(l)
+
+
+def line_from_dict(d: Dict[str, Any]) -> LineSim:
+    return LineSim(**d)
+
+
+def tag_to_dict(t: TagRecord) -> Dict[str, Any]:
+    return dataclasses.asdict(t)
+
+
+def tag_from_dict(d: Dict[str, Any]) -> TagRecord:
+    return TagRecord(**d)
+
+
+def state_to_dict(s: MagicaState) -> Dict[str, Any]:
+    return {
+        "current_block": s.current_block,
+        "next_vault_id": s.next_vault_id,
+        "next_line_id": s.next_line_id,
+        "vaults": {str(k): vault_to_dict(v) for k, v in s.vaults.items()},
+        "vault_positions": {
+            f"{vid}:{addr}": pos_to_dict(p)
+            for (vid, addr), p in s.vault_positions.items()
+        },
+        "lines": {str(k): line_to_dict(v) for k, v in s.lines.items()},
+        "tags": {addr: tag_to_dict(t) for addr, t in s.tags.items()},
+        "fee_collector": s.fee_collector,
+        "guardian": s.guardian,
+        "risk_council": s.risk_council,
+        "protocol_fee_wei": s.protocol_fee_wei,
+    }
+
+
+def state_from_dict(d: Dict[str, Any]) -> MagicaState:
+    s = MagicaState()
+    s.current_block = int(d.get("current_block", 0))
+    s.next_vault_id = int(d.get("next_vault_id", 1))
+    s.next_line_id = int(d.get("next_line_id", 1))
+    s.fee_collector = d.get("fee_collector", s.fee_collector)
+    s.guardian = d.get("guardian", s.guardian)
+    s.risk_council = d.get("risk_council", s.risk_council)
+    s.protocol_fee_wei = float(d.get("protocol_fee_wei", 0.0))
+
+    for k, v in d.get("vaults", {}).items():
