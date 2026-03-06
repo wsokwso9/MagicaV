@@ -1123,3 +1123,70 @@ def build_parser() -> argparse.ArgumentParser:
     p_rs.add_argument("-y", "--yes", action="store_true")
 
     p_ch = sub.add_parser("chain", help="Show basic chain info via RPC")
+    p_ch.add_argument("--rpc", default=None)
+
+    sub.add_parser("menu", help="Interactive menu")
+
+    return parser
+
+
+# ---------------------------------------------------------------------------
+# Main entry
+# ---------------------------------------------------------------------------
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if not args.command:
+        return interactive_menu(args)
+
+    cmd = args.command
+    if cmd == "info":
+        return cmd_info(args)
+    if cmd == "step":
+        return cmd_step(args)
+    if cmd == "open-vault":
+        return cmd_open_vault(args)
+    if cmd == "vaults":
+        return cmd_vaults(args)
+    if cmd == "vault":
+        return cmd_vault(args)
+    if cmd == "deposit":
+        return cmd_deposit(args)
+    if cmd == "withdraw":
+        return cmd_withdraw(args)
+    if cmd == "positions":
+        return cmd_positions(args)
+    if cmd == "harvest":
+        return cmd_harvest(args)
+    if cmd == "open-line":
+        return cmd_open_line(args)
+    if cmd == "lines":
+        return cmd_lines(args)
+    if cmd == "line":
+        return cmd_line(args)
+    if cmd == "draw":
+        return cmd_draw(args)
+    if cmd == "repay":
+        return cmd_repay(args)
+    if cmd == "tags":
+        return cmd_tags(args)
+    if cmd == "set-tag":
+        return cmd_set_tag(args)
+    if cmd == "config":
+        return cmd_config(args)
+    if cmd == "reset":
+        return cmd_reset(args)
+    if cmd == "chain":
+        return cmd_chain(args)
+    if cmd == "menu":
+        return interactive_menu(args)
+
+    parser.print_help()
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
